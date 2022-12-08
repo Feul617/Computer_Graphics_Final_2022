@@ -14,7 +14,8 @@ typedef struct Box {
 	glm::vec3 Bscale;
 	glm::vec3 Blocate;
 
-	float Color;
+	glm::vec3 Color;
+	int offset;
 }Box;
 
 typedef struct Player {
@@ -26,9 +27,14 @@ typedef struct Player {
 	glm::vec3 cameraPos;
 	glm::vec3 cameraDirection;
 
-	int x, z;
+	glm::vec3 collider_box[2];
+
+	int x, y, z;
 	int prev_locate[2];
 	float lotate;
+	float gravity;
+
+	float speed;
 	bool view;
 }Player;
 
@@ -410,6 +416,8 @@ void Boxinit(int x, int y) {				// 박스 갯수 추후에 25/25로 늘려도 박스 배열만 �
 			All_Box[i][k].Blocate[1] = -yScale;
 			All_Box[i][k].Blocate[2] = zlocate - zScale * a;
 
+			All_Box[i][k].offset = i * k;
+
 		}
 
 	}
@@ -481,7 +489,10 @@ void playerinit() {
 	player.prev_locate[0] = 0;
 	player.prev_locate[1] = 0;
 	player.x = 0;
+	player.y = 0;
 	player.z = 0;
+
+	player.speed = 0.02f;
 }
 
 void Box_crash(Player* p) {								// 박스 충돌체크
@@ -496,9 +507,10 @@ void Box_crash(Player* p) {								// 박스 충돌체크
 	TR = Tx * Rotate * Scale * TR;
 
 	glm::vec4 left_front = TR * glm::vec4(-0.5f, 0.0f, -0.5f, 1.0f);					// 플레이어 왼,오른,앞,뒤  원래 좌표를 각각 vec로 저장
-	glm::vec4 right_front = TR * glm::vec4(0.5f, 0.0f, -0.5f, 1.0f);
+	glm::vec4 right_front = TR * glm::vec4(0.5f, 0.0f, -0.5f, 1.0f);					//얘네가 콜라이더 박스
 	glm::vec4 left_back = TR * glm::vec4(-0.5f, 0.0f, 0.5f, 1.0f);
 	glm::vec4 right_back = TR * glm::vec4(0.5f, 0.0f, 0.5f, 1.0f);
+
 
 	left_front[0] += 5.0f + 0.01,left_front[2] += 5.0f + 0.01;							// 현재 좌표를 계산 후, 해당 좌표를 배열 인덱스로 변환 
 	left_front[0] = left_front[0] / xScale, left_front[2] = left_front[2] / zScale;
@@ -553,3 +565,35 @@ void player_Camera(Player* p) {
 	p->cameraDirection[2] = cos(glm::radians(p->lotate)) * -1.0;
 
 }
+
+int collide(Player* p, Box* b)
+{
+	glm::vec3 player_bounding_box[2] = { (p->Plocate + p->Move) - p->Pscale, (p->Plocate - p->Move) + p->Pscale}; // 0이 min, 1이 max
+	glm::vec3 box_bounding_box[2] = { b->Blocate - b->Bscale, b->Blocate + b->Bscale };
+
+	//플레이어가 박스보다 좌측 즉 플레이어 max < 박스 min
+	if (player_bounding_box[1][0] < box_bounding_box[0][0] && player_bounding_box[1][1] < box_bounding_box[0][1] && player_bounding_box[1][2] < box_bounding_box[0][2]) return 0;
+	//플레이어 min > 박스 max
+	if (player_bounding_box[0][0] > box_bounding_box[1][0] && player_bounding_box[0][1] > box_bounding_box[1][1] && player_bounding_box[0][2] > box_bounding_box[1][2]) return 0;
+
+	return b->offset;
+
+}
+
+void Crash(Player* p)
+{
+	int inspection = collide(p, *All_Box);
+
+	if (inspection > 0) {
+		p->y += p->gravity;
+	}
+
+	for (int i = 0; i < xcount; i++) {
+		for (int k = 0; k < Ycount; k++) {
+			if (inspection == All_Box[i][k].offset)
+				All_Box[i][k].Color = p->PColor;
+		}
+	}
+}
+
+
